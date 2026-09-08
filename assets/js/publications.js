@@ -21,24 +21,34 @@ async function loadPublications() {
         );
 
         if (!response.ok) {
+
             throw new Error(
                 "Could not load publications.bib: "
                 + response.status
             );
+
         }
 
-        const bibtex = await response.text();
+
+        const bibtex =
+            await response.text();
+
 
 
         /* =====================================================
            Check parser
         ===================================================== */
 
-        if (typeof bibtexParse === "undefined") {
+        if (
+            typeof bibtexParse === "undefined"
+        ) {
+
             throw new Error(
                 "BibTeX parser did not load."
             );
+
         }
+
 
 
         /* =====================================================
@@ -46,98 +56,114 @@ async function loadPublications() {
         ===================================================== */
 
         const rawEntries =
-            bibtexParse.toJSON(bibtex);
+            bibtexParse.toJSON(
+                bibtex
+            );
+
 
 
         /* =====================================================
-           Normalize all BibTeX field names to lowercase
+           Normalize BibTeX fields
         ===================================================== */
 
-        const entries = rawEntries.map(entry => {
+        const entries =
+            rawEntries.map(
+                function (entry) {
 
-            const normalizedTags = {};
+                    const normalizedTags =
+                        {};
 
-            for (
-                const [key, value]
-                of Object.entries(
-                    entry.entryTags || {}
-                )
-            ) {
 
-                normalizedTags[
-                    key.toLowerCase()
-                ] = value;
+                    for (
+                        const [key, value]
+                        of Object.entries(
+                            entry.entryTags || {}
+                        )
+                    ) {
 
-            }
+                        normalizedTags[
+                            key.toLowerCase()
+                        ] = value;
 
-            return {
+                    }
 
-                citationKey:
-                    entry.citationKey || "",
 
-                entryType:
-                    (entry.entryType || "")
-                        .toLowerCase(),
+                    return {
 
-                tags:
-                    normalizedTags
+                        citationKey:
+                            entry.citationKey || "",
 
-            };
+                        entryType:
+                            normalizeEntryType(
+                                entry.entryType || ""
+                            ),
 
-        });
+                        tags:
+                            normalizedTags
+
+                    };
+
+                }
+            );
+
 
 
         /* =====================================================
            Sort newest to oldest
 
-           Optional:
-           If two entries have the same year,
-           use:
+           Optional BibTeX field:
+
                order = {3}
                order = {2}
                order = {1}
 
-           Higher order appears first.
+           Higher order appears first for entries
+           having the same year.
         ===================================================== */
 
-        entries.sort((a, b) => {
+        entries.sort(
+            function (a, b) {
 
-            const yearA =
-                parseInt(
-                    a.tags.year || "0",
-                    10
-                );
+                const yearA =
+                    parseInt(
+                        a.tags.year || "0",
+                        10
+                    );
 
-            const yearB =
-                parseInt(
-                    b.tags.year || "0",
-                    10
-                );
+                const yearB =
+                    parseInt(
+                        b.tags.year || "0",
+                        10
+                    );
 
 
-            if (yearA !== yearB) {
+                if (
+                    yearA !== yearB
+                ) {
 
-                return yearB - yearA;
+                    return yearB - yearA;
+
+                }
+
+
+                const orderA =
+                    parseInt(
+                        a.tags.order || "0",
+                        10
+                    );
+
+                const orderB =
+                    parseInt(
+                        b.tags.order || "0",
+                        10
+                    );
+
+
+                return orderB - orderA;
 
             }
+        );
 
-
-            const orderA =
-                parseInt(
-                    a.tags.order || "0",
-                    10
-                );
-
-            const orderB =
-                parseInt(
-                    b.tags.order || "0",
-                    10
-                );
-
-
-            return orderB - orderA;
-
-        });
 
 
         /* =====================================================
@@ -149,77 +175,59 @@ async function loadPublications() {
         const theses = [];
 
 
-        entries.forEach(entry => {
+        entries.forEach(
+            function (entry) {
 
-            const tags =
-                entry.tags;
-
-
-            let category =
-                (tags.category || "")
-                    .toLowerCase()
-                    .trim();
+                const tags =
+                    entry.tags;
 
 
-            /* Infer category if missing */
+                const category =
+                    determineCategory(
+                        tags,
+                        entry.entryType
+                    );
 
-            if (!category) {
+
+                const html =
+                    formatPublication(
+                        tags,
+                        entry.entryType,
+                        category
+                    );
+
 
                 if (
-                    entry.entryType === "phdthesis" ||
-                    entry.entryType === "mastersthesis"
+                    category === "preprint"
                 ) {
 
-                    category =
-                        "thesis";
+                    preprints.push(
+                        html
+                    );
+
+                }
+
+                else if (
+                    category === "thesis"
+                ) {
+
+                    theses.push(
+                        html
+                    );
 
                 }
 
                 else {
 
-                    category =
-                        "published";
+                    published.push(
+                        html
+                    );
 
                 }
 
             }
+        );
 
-
-            const html =
-                formatPublication(
-                    tags,
-                    entry.entryType,
-                    category
-                );
-
-
-            if (
-                category === "preprint" ||
-                category === "working" ||
-                category === "workingpaper" ||
-                category === "working paper"
-            ) {
-
-                preprints.push(html);
-
-            }
-
-            else if (
-                category === "thesis" ||
-                category === "dissertation"
-            ) {
-
-                theses.push(html);
-
-            }
-
-            else {
-
-                published.push(html);
-
-            }
-
-        });
 
 
         /* =====================================================
@@ -243,7 +251,7 @@ async function loadPublications() {
         displayPublications(
             thesisContainer,
             theses,
-            "No dissertation currently listed."
+            "No theses currently listed."
         );
 
     }
@@ -257,7 +265,9 @@ async function loadPublications() {
         );
 
 
-        if (publishedContainer) {
+        if (
+            publishedContainer
+        ) {
 
             publishedContainer.innerHTML =
                 "<li>Unable to load publications.</li>";
@@ -265,7 +275,9 @@ async function loadPublications() {
         }
 
 
-        if (preprintContainer) {
+        if (
+            preprintContainer
+        ) {
 
             preprintContainer.innerHTML =
                 "<li>Unable to load preprints and working papers.</li>";
@@ -273,14 +285,282 @@ async function loadPublications() {
         }
 
 
-        if (thesisContainer) {
+        if (
+            thesisContainer
+        ) {
 
             thesisContainer.innerHTML =
-                "<li>Unable to load dissertation.</li>";
+                "<li>Unable to load theses.</li>";
 
         }
 
     }
+
+}
+
+
+
+/* =========================================================
+   Normalize BibTeX entry type
+========================================================= */
+
+function normalizeEntryType(
+    entryType
+) {
+
+    return String(
+        entryType || ""
+    )
+        .toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/[_-]/g, "")
+        .trim();
+
+}
+
+
+
+/* =========================================================
+   Determine publication category
+========================================================= */
+
+function determineCategory(
+    tags,
+    entryType
+) {
+
+    let category =
+        String(
+            tags.category || ""
+        )
+            .toLowerCase()
+            .trim();
+
+
+    /* -----------------------------------------------------
+       Normalize category spelling
+    ----------------------------------------------------- */
+
+    const normalizedCategory =
+        category
+            .replace(/[’']/g, "")
+            .replace(/[_-]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+
+
+    /* -----------------------------------------------------
+       Thesis / dissertation
+    ----------------------------------------------------- */
+
+    if (
+        isThesisEntry(
+            entryType,
+            normalizedCategory
+        )
+    ) {
+
+        return "thesis";
+
+    }
+
+
+
+    /* -----------------------------------------------------
+       Preprint / working paper
+    ----------------------------------------------------- */
+
+    if (
+        normalizedCategory === "preprint" ||
+        normalizedCategory === "working" ||
+        normalizedCategory === "workingpaper" ||
+        normalizedCategory === "working paper"
+    ) {
+
+        return "preprint";
+
+    }
+
+
+
+    /* -----------------------------------------------------
+       Default
+    ----------------------------------------------------- */
+
+    return "published";
+
+}
+
+
+
+/* =========================================================
+   Detect thesis entries
+========================================================= */
+
+function isThesisEntry(
+    entryType,
+    category
+) {
+
+    const normalizedType =
+        normalizeEntryType(
+            entryType
+        );
+
+
+    const normalizedCategory =
+        String(
+            category || ""
+        )
+            .toLowerCase()
+            .replace(/[’']/g, "")
+            .replace(/[_-]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+
+    return (
+
+        normalizedType ===
+            "phdthesis" ||
+
+        normalizedType ===
+            "mastersthesis" ||
+
+        normalizedType ===
+            "masterthesis" ||
+
+        normalizedCategory ===
+            "thesis" ||
+
+        normalizedCategory ===
+            "dissertation" ||
+
+        normalizedCategory ===
+            "phd thesis" ||
+
+        normalizedCategory ===
+            "phd dissertation" ||
+
+        normalizedCategory ===
+            "doctoral dissertation" ||
+
+        normalizedCategory ===
+            "master thesis" ||
+
+        normalizedCategory ===
+            "masters thesis"
+
+    );
+
+}
+
+
+
+/* =========================================================
+   Determine thesis label
+========================================================= */
+
+function getThesisLabel(
+    tags,
+    entryType
+) {
+
+    const normalizedType =
+        normalizeEntryType(
+            entryType
+        );
+
+
+    const typeField =
+        String(
+            tags.type || ""
+        )
+            .toLowerCase()
+            .replace(/[’']/g, "")
+            .replace(/[_-]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+
+    const categoryField =
+        String(
+            tags.category || ""
+        )
+            .toLowerCase()
+            .replace(/[’']/g, "")
+            .replace(/[_-]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+
+
+    /* -----------------------------------------------------
+       Master's thesis
+    ----------------------------------------------------- */
+
+    if (
+        normalizedType ===
+            "mastersthesis" ||
+
+        normalizedType ===
+            "masterthesis" ||
+
+        typeField.includes(
+            "master"
+        ) ||
+
+        categoryField.includes(
+            "master"
+        )
+    ) {
+
+        return "Master's Thesis";
+
+    }
+
+
+
+    /* -----------------------------------------------------
+       Ph.D. dissertation
+    ----------------------------------------------------- */
+
+    if (
+        normalizedType ===
+            "phdthesis" ||
+
+        typeField.includes(
+            "phd"
+        ) ||
+
+        typeField.includes(
+            "doctoral"
+        ) ||
+
+        categoryField.includes(
+            "phd"
+        ) ||
+
+        categoryField.includes(
+            "doctoral"
+        ) ||
+
+        categoryField ===
+            "dissertation"
+    ) {
+
+        return "Ph.D. Dissertation";
+
+    }
+
+
+
+    /* -----------------------------------------------------
+       Generic fallback
+    ----------------------------------------------------- */
+
+    return "Thesis";
 
 }
 
@@ -296,30 +576,39 @@ function formatPublication(
     category
 ) {
 
-    let html = "";
+    let html =
+        "";
+
 
 
     /* =====================================================
        Authors
     ===================================================== */
 
-    if (tags.author) {
+    if (
+        tags.author
+    ) {
 
         html +=
             formatAuthors(
                 tags.author
             );
 
-        html += ". ";
+
+        html +=
+            ". ";
 
     }
+
 
 
     /* =====================================================
        Title
     ===================================================== */
 
-    if (tags.title) {
+    if (
+        tags.title
+    ) {
 
         const title =
             cleanText(
@@ -328,8 +617,8 @@ function formatPublication(
 
 
         if (
-            category === "thesis" ||
-            category === "dissertation"
+            category ===
+                "thesis"
         ) {
 
             html +=
@@ -347,11 +636,14 @@ function formatPublication(
     }
 
 
+
     /* =====================================================
        Journal article
     ===================================================== */
 
-    if (tags.journal) {
+    if (
+        tags.journal
+    ) {
 
         html +=
             `<em>${cleanText(
@@ -359,7 +651,9 @@ function formatPublication(
             )}</em>`;
 
 
-        if (tags.volume) {
+        if (
+            tags.volume
+        ) {
 
             html +=
                 ` ${cleanText(
@@ -369,7 +663,9 @@ function formatPublication(
         }
 
 
-        if (tags.number) {
+        if (
+            tags.number
+        ) {
 
             html +=
                 `(${cleanText(
@@ -379,7 +675,9 @@ function formatPublication(
         }
 
 
-        if (tags.year) {
+        if (
+            tags.year
+        ) {
 
             html +=
                 ` (${cleanText(
@@ -389,7 +687,9 @@ function formatPublication(
         }
 
 
-        if (tags.pages) {
+        if (
+            tags.pages
+        ) {
 
             html +=
                 `: ${cleanText(
@@ -399,16 +699,20 @@ function formatPublication(
         }
 
 
-        html += ". ";
+        html +=
+            ". ";
 
     }
+
 
 
     /* =====================================================
        Proceedings / conference paper
     ===================================================== */
 
-    else if (tags.booktitle) {
+    else if (
+        tags.booktitle
+    ) {
 
         html +=
             `<em>${cleanText(
@@ -416,7 +720,9 @@ function formatPublication(
             )}</em>`;
 
 
-        if (tags.volume) {
+        if (
+            tags.volume
+        ) {
 
             html +=
                 ` ${cleanText(
@@ -426,7 +732,9 @@ function formatPublication(
         }
 
 
-        if (tags.year) {
+        if (
+            tags.year
+        ) {
 
             html +=
                 ` (${cleanText(
@@ -436,7 +744,9 @@ function formatPublication(
         }
 
 
-        if (tags.pages) {
+        if (
+            tags.pages
+        ) {
 
             html +=
                 `: ${cleanText(
@@ -446,43 +756,47 @@ function formatPublication(
         }
 
 
-        html += ". ";
+        html +=
+            ". ";
 
     }
+
 
 
     /* =====================================================
        Thesis / Dissertation
     ===================================================== */
 
-    else if (tags.school) {
+    else if (
+        category === "thesis"
+    ) {
 
-        if (
-            entryType === "phdthesis"
-        ) {
-
-            html +=
-                "Ph.D. Dissertation, ";
-
-        }
-
-        else if (
-            entryType === "mastersthesis"
-        ) {
-
-            html +=
-                "Master's Thesis, ";
-
-        }
-
-
-        html +=
-            cleanText(
-                tags.school
+        const thesisLabel =
+            getThesisLabel(
+                tags,
+                entryType
             );
 
 
-        if (tags.year) {
+        html +=
+            `${thesisLabel}`;
+
+
+        if (
+            tags.school
+        ) {
+
+            html +=
+                `, ${cleanText(
+                    tags.school
+                )}`;
+
+        }
+
+
+        if (
+            tags.year
+        ) {
 
             html +=
                 `, ${cleanText(
@@ -492,16 +806,20 @@ function formatPublication(
         }
 
 
-        html += ". ";
+        html +=
+            ". ";
 
     }
+
 
 
     /* =====================================================
        Preprint / Working Paper
     ===================================================== */
 
-    else if (tags.year) {
+    else if (
+        tags.year
+    ) {
 
         html +=
             `${cleanText(
@@ -511,13 +829,16 @@ function formatPublication(
     }
 
 
+
     /* =====================================================
        Note / Status
 
-       This comes BEFORE all links.
+       Comes before links.
     ===================================================== */
 
-    if (tags.note) {
+    if (
+        tags.note
+    ) {
 
         let note =
             cleanText(
@@ -525,16 +846,14 @@ function formatPublication(
             );
 
 
-        /*
-         * Add punctuation automatically
-         * if the note has none.
-         */
-
         if (
-            !/[.!?]$/.test(note)
+            !/[.!?]$/.test(
+                note
+            )
         ) {
 
-            note += ".";
+            note +=
+                ".";
 
         }
 
@@ -545,25 +864,29 @@ function formatPublication(
     }
 
 
+
     /* =====================================================
        Links
-
-       These come AFTER citation and note.
     ===================================================== */
 
-    let links = "";
+    let links =
+        "";
+
 
 
     /* -----------------------------------------------------
        DOI
     ----------------------------------------------------- */
 
-    if (tags.doi) {
+    if (
+        tags.doi
+    ) {
 
         const doi =
             cleanText(
                 tags.doi
             );
+
 
         links += `
             <a class="pub-link"
@@ -577,16 +900,20 @@ function formatPublication(
     }
 
 
+
     /* -----------------------------------------------------
        arXiv
     ----------------------------------------------------- */
 
-    if (tags.eprint) {
+    if (
+        tags.eprint
+    ) {
 
         const eprint =
             cleanText(
                 tags.eprint
             );
+
 
         links += `
             <a class="pub-link"
@@ -600,19 +927,22 @@ function formatPublication(
     }
 
 
+
     /* -----------------------------------------------------
        Generic URL
     ----------------------------------------------------- */
 
-    if (tags.url) {
+    if (
+        tags.url
+    ) {
 
         let linkText =
             "Paper";
 
 
         if (
-            category === "thesis" ||
-            category === "dissertation"
+            category ===
+                "thesis"
         ) {
 
             linkText =
@@ -621,7 +951,8 @@ function formatPublication(
         }
 
         else if (
-            category === "published"
+            category ===
+                "published"
         ) {
 
             linkText =
@@ -633,7 +964,9 @@ function formatPublication(
         links += `
             <a class="pub-link"
                href="${escapeAttribute(
-                   cleanText(tags.url)
+                   cleanText(
+                       tags.url
+                   )
                )}"
                target="_blank"
                rel="noopener noreferrer">
@@ -644,11 +977,14 @@ function formatPublication(
     }
 
 
+
     /* =====================================================
-       Add links after note
+       Add links
     ===================================================== */
 
-    if (links) {
+    if (
+        links
+    ) {
 
         html += `
             <span class="pub-links">
@@ -680,88 +1016,98 @@ function formatAuthors(
 
 
     const formatted =
-        authors.map(author => {
+        authors.map(
+            function (author) {
 
-            author =
-                author.trim();
-
-
-            let displayName =
-                author;
+                author =
+                    author.trim();
 
 
-            /* -------------------------------------------------
-               Convert:
-
-               Xie, Bowen
-
-               to:
-
-               Bowen Xie
-            ------------------------------------------------- */
-
-            if (
-                author.includes(",")
-            ) {
-
-                const pieces =
-                    author.split(",");
+                let displayName =
+                    author;
 
 
-                const last =
-                    pieces[0]
-                        .trim();
+
+                /* -------------------------------------------------
+                   Convert:
+
+                       Xie, Bowen
+
+                   to:
+
+                       Bowen Xie
+                ------------------------------------------------- */
+
+                if (
+                    author.includes(",")
+                ) {
+
+                    const pieces =
+                        author.split(",");
 
 
-                const first =
-                    pieces
-                        .slice(1)
-                        .join(" ")
-                        .trim();
+                    const last =
+                        pieces[0]
+                            .trim();
+
+
+                    const first =
+                        pieces
+                            .slice(1)
+                            .join(" ")
+                            .trim();
+
+
+                    displayName =
+                        `${first} ${last}`;
+
+                }
 
 
                 displayName =
-                    `${first} ${last}`;
+                    cleanText(
+                        displayName
+                    );
 
-            }
 
 
-            displayName =
-                cleanText(
+                /* -------------------------------------------------
+                   Bold Bowen Xie
+                ------------------------------------------------- */
+
+                const normalized =
                     displayName
-                );
+                        .toLowerCase()
+                        .replace(/\./g, "")
+                        .replace(/\s+/g, " ")
+                        .trim();
 
 
-            /* -------------------------------------------------
-               Bold Bowen Xie
-            ------------------------------------------------- */
+                if (
+                    normalized ===
+                        "bowen xie" ||
 
-            const normalized =
-                displayName
-                    .toLowerCase()
-                    .replace(/\./g, "")
-                    .replace(/\s+/g, " ")
-                    .trim();
+                    normalized ===
+                        "b xie"
+                ) {
+
+                    return (
+                        `<strong>${displayName}</strong>`
+                    );
+
+                }
 
 
-            if (
-                normalized === "bowen xie" ||
-                normalized === "b xie"
-            ) {
-
-                return (
-                    `<strong>${displayName}</strong>`
-                );
+                return displayName;
 
             }
+        );
 
 
-            return displayName;
 
-        });
-
-
-    /* One author */
+    /* =====================================================
+       One author
+    ===================================================== */
 
     if (
         formatted.length === 1
@@ -772,7 +1118,10 @@ function formatAuthors(
     }
 
 
-    /* Two authors */
+
+    /* =====================================================
+       Two authors
+    ===================================================== */
 
     if (
         formatted.length === 2
@@ -787,16 +1136,26 @@ function formatAuthors(
     }
 
 
-    /* Three or more authors */
+
+    /* =====================================================
+       Three or more authors
+    ===================================================== */
 
     return (
+
         formatted
-            .slice(0, -1)
+            .slice(
+                0,
+                -1
+            )
             .join(", ")
+
         + ", and "
+
         + formatted[
             formatted.length - 1
         ]
+
     );
 
 }
@@ -807,41 +1166,65 @@ function formatAuthors(
    Clean BibTeX text
 ========================================================= */
 
-function cleanText(text) {
+function cleanText(
+    text
+) {
 
-    if (!text) {
+    if (
+        !text
+    ) {
+
         return "";
+
     }
 
 
-    return String(text)
+    return String(
+        text
+    )
 
-        /*
-         * Remove BibTeX braces
-         */
+        /* Remove BibTeX braces */
 
-        .replace(/[{}]/g, "")
+        .replace(
+            /[{}]/g,
+            ""
+        )
 
-        /*
-         * Convert BibTeX dashes
-         */
+        /* Convert BibTeX dashes */
 
-        .replace(/---/g, "—")
-        .replace(/--/g, "–")
+        .replace(
+            /---/g,
+            "—"
+        )
 
-        /*
-         * Common LaTeX symbols
-         */
+        .replace(
+            /--/g,
+            "–"
+        )
 
-        .replace(/\\&/g, "&")
-        .replace(/\\%/g, "%")
-        .replace(/\\_/g, "_")
+        /* Common LaTeX symbols */
 
-        /*
-         * Collapse whitespace
-         */
+        .replace(
+            /\\&/g,
+            "&"
+        )
 
-        .replace(/\s+/g, " ")
+        .replace(
+            /\\%/g,
+            "%"
+        )
+
+        .replace(
+            /\\_/g,
+            "_"
+        )
+
+        /* Collapse whitespace */
+
+        .replace(
+            /\s+/g,
+            " "
+        )
 
         .trim();
 
@@ -853,17 +1236,33 @@ function cleanText(text) {
    Escape URL attributes
 ========================================================= */
 
-function escapeAttribute(text) {
+function escapeAttribute(
+    text
+) {
 
-    return String(text)
+    return String(
+        text
+    )
 
-        .replace(/&/g, "&amp;")
+        .replace(
+            /&/g,
+            "&amp;"
+        )
 
-        .replace(/"/g, "&quot;")
+        .replace(
+            /"/g,
+            "&quot;"
+        )
 
-        .replace(/</g, "&lt;")
+        .replace(
+            /</g,
+            "&lt;"
+        )
 
-        .replace(/>/g, "&gt;");
+        .replace(
+            />/g,
+            "&gt;"
+        );
 
 }
 
@@ -879,8 +1278,12 @@ function displayPublications(
     emptyMessage
 ) {
 
-    if (!container) {
+    if (
+        !container
+    ) {
+
         return;
+
     }
 
 
@@ -891,6 +1294,7 @@ function displayPublications(
         container.innerHTML =
             `<li>${emptyMessage}</li>`;
 
+
         return;
 
     }
@@ -899,8 +1303,13 @@ function displayPublications(
     container.innerHTML =
         publications
             .map(
-                publication =>
-                    `<li>${publication}</li>`
+                function (publication) {
+
+                    return (
+                        `<li>${publication}</li>`
+                    );
+
+                }
             )
             .join("");
 
